@@ -1,7 +1,14 @@
-'use client';
-import React from 'react';
+"use client";
 
-interface VendorCardProps {
+import React from "react";
+import { motion } from "framer-motion";
+
+/**
+ * Props for the VendorCard component. Many fields are optional to allow
+ * flexibility when rendering partial vendor data.
+ */
+export interface VendorCardProps {
+  id: string;
   name: string;
   photoUrl?: string;
   rating?: number;
@@ -9,101 +16,134 @@ interface VendorCardProps {
   estimatedPrice?: string;
   distance?: string;
   topReviews?: string[];
-  onSelect?: () => void;
-  onReject?: () => void;
   explanation?: string;
+  onSelect?: (id: string) => void;
+  onReject?: (id: string) => void;
 }
 
 /**
- * A card component to display a vendor with photo, rating, price estimate, distance and reviews.
+ * Utility to trigger a small vibration on supported devices. When called
+ * before an action (e.g., selecting a vendor), it improves feedback on
+ * mobile devices. If vibration is not supported, it silently fails.
  */
-const VendorCard: React.FC<VendorCardProps> = ({
+function triggerVibration(duration = 50) {
+  if (typeof window !== "undefined" && navigator.vibrate) {
+    navigator.vibrate(duration);
+  }
+}
+
+/**
+ * Renders a vendor card with optional photo, rating, and pricing details.
+ * Animations are handled by Framer Motion to smoothly fade cards into
+ * view. Selecting or rejecting a vendor will trigger haptic feedback on
+ * mobile and call the provided callbacks.
+ */
+export default function VendorCard({
+  id,
   name,
   photoUrl,
   rating,
   reviewCount,
   estimatedPrice,
   distance,
-  topReviews = [],
+  topReviews,
+  explanation,
   onSelect,
-  onReject,
-  explanation
-}) => {
-  // Render star rating using Unicode stars
-  const renderStars = (value?: number) => {
-    if (value === undefined) return null;
-    const full = Math.floor(value);
-    const half = value - full >= 0.5;
-    return (
-      <span>
-        {Array.from({ length: full }).map((_, i) => (
-          <span key={`full-${i}`} className="text-yellow-400">\u2605</span>
-        ))}
-        {half && <span className="text-yellow-400">\u2606</span>}
-      </span>
-    );
+  onReject
+}: VendorCardProps) {
+  // Helper to render star icons based on rating value. Uses filled stars
+  // for whole numbers and empty stars for the remainder up to five.
+  function renderStars(value: number = 0) {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <span key={i} className={i <= Math.round(value) ? "text-yellow-500" : "text-gray-300"}>
+          ★
+        </span>
+      );
+    }
+    return stars;
+  }
+
+  const handleSelect = () => {
+    triggerVibration(70);
+    onSelect?.(id);
+  };
+  const handleReject = () => {
+    triggerVibration(70);
+    onReject?.(id);
   };
 
   return (
-    <div className="border rounded-lg shadow p-4 flex flex-col w-full max-w-md bg-white">
-      {photoUrl && (
-        <img
-          src={photoUrl}
-          alt={name}
-          className="w-full h-40 object-cover rounded-md mb-3"
-        />
-      )}
-      <h3 className="text-lg font-semibold mb-1">{name}</h3>
-      <div className="flex items-center text-sm mb-2">
-        {renderStars(rating)}
-        {rating !== undefined && (
-          <span className="ml-2 text-gray-600">{rating.toFixed(1)}</span>
-        )}
-        {reviewCount !== undefined && (
-          <span className="ml-1 text-gray-500">({reviewCount})</span>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="border rounded shadow-sm p-4 bg-white flex flex-col space-y-3 w-full"
+    >
+      {/* Image placeholder or photo */}
+      <div className="w-full h-40 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photoUrl}
+            alt={`${name} photo`}
+            className="object-cover w-full h-full"
+          />
+        ) : (
+          <span className="text-gray-400">No Image</span>
         )}
       </div>
-      {estimatedPrice && (
-        <div className="text-sm text-gray-700 mb-1">Price: {estimatedPrice}</div>
+      {/* Name and rating */}
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold truncate" title={name}>{name}</h3>
+        {rating !== undefined && (
+          <div className="flex items-center">
+            {renderStars(rating)}
+            {reviewCount !== undefined && (
+              <span className="ml-1 text-sm text-gray-500">({reviewCount})</span>
+            )}
+          </div>
+        )}
+      </div>
+      {/* Price and distance */}
+      <div className="flex justify-between text-sm text-gray-600">
+        {estimatedPrice && <span>Price: {estimatedPrice}</span>}
+        {distance && <span>{distance} away</span>}
+      </div>
+      {/* Explanation or notes */}
+      {explanation && (
+        <p className="text-gray-700 text-sm line-clamp-3" title={explanation}>{explanation}</p>
       )}
-      {distance && (
-        <div className="text-sm text-gray-700 mb-1">Distance: {distance}</div>
-      )}
-      {topReviews.length > 0 && (
-        <div className="text-sm text-gray-700 mb-2">
-          <div className="font-medium">Top Reviews:</div>
-          <ul className="list-disc list-inside">
-            {topReviews.slice(0, 2).map((review, idx) => (
-              <li key={idx} className="text-gray-600 truncate">
-                {review}
-              </li>
-            ))}
-          </ul>
+      {/* Top reviews list */}
+      {topReviews && topReviews.length > 0 && (
+        <div className="space-y-1">
+          {topReviews.slice(0, 2).map((review, idx) => (
+            <p key={idx} className="text-xs text-gray-500 italic line-clamp-2">
+              "{review}"
+            </p>
+          ))}
         </div>
       )}
-      {explanation && (
-        <div className="text-sm italic text-gray-500 mb-2">{explanation}</div>
-      )}
-      <div className="flex space-x-2 mt-auto">
+      {/* Action buttons */}
+      <div className="flex space-x-2 pt-2">
         {onSelect && (
           <button
-            onClick={onSelect}
-            className="flex-1 px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm"
+            onClick={handleSelect}
+            className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
           >
             Select
           </button>
         )}
         {onReject && (
           <button
-            onClick={onReject}
-            className="flex-1 px-3 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm"
+            onClick={handleReject}
+            className="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
           >
             Reject
           </button>
         )}
       </div>
-    </div>
+    </motion.div>
   );
-};
-
-export default VendorCard;
+}
